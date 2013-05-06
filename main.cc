@@ -5,7 +5,7 @@
 #include "opencv2/opencv.hpp"
 
 // Transform Intel Training Samples to OpenCV Readable Training Samples
-void transformIntelSampleToOpenCVSample(const string &samp, const string &vec)
+void transform_IntelSample_To_OpenCVSample(const string &samp, const string &vec)
 {
 	FILE* fpsamintel = fopen(samp.c_str(), "rb");
     if (fpsamintel)
@@ -125,6 +125,51 @@ void combile_vecs(const string &vec1, const string &vec2, const string &vec3)
     fclose(fvec1);
     fclose(fvec2);
     fclose(fvec3);
+}
+
+void show_vec_file(const string &vec)
+{
+    FILE *p = fopen(vec.c_str(), "rb");
+
+    if (p == NULL)
+    {
+        printf("Open File %s error\n", vec.c_str());
+        exit(-1)
+    }
+    
+    int vecsize;
+    short tmp;
+
+    int count;
+    fread( &count, sizeof( count ), 1, p );
+    fread( &vecsize, sizeof( vecsize ), 1, p );
+    cout << count << endl;
+    cout << vecsize << endl;
+    fread( &tmp, sizeof( tmp ), 1, p );
+    fread( &tmp, sizeof( tmp ), 1, p );
+    
+    for (int i = 0; i < count; i++) {
+        char chartmp = 0;
+        fread( &chartmp, sizeof( chartmp ), 1, p );
+        short data[24*24];
+        fread(data, sizeof(short), 24*24, p);
+        
+        Mat im = Mat(24, 24, CV_8UC1);
+        int idx = 0;
+        for (int r = 0; r < 24; r++) {
+            for (int c = 0; c < 24; c++) {
+                im.at<uchar>(r, c) = (uchar)data[idx++];
+            }
+        }
+        // imshow("TEST", im);
+        // while (1) {
+        //     if (waitKey(10) == 'q') {
+        //         break;
+        //     }
+        // }
+    }
+    
+    fclose(p);
 }
 
 int main()
