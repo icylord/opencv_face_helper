@@ -4,6 +4,38 @@
 
 #include "opencv2/opencv.hpp"
 
+using namespace std;
+using namespace cv;
+
+void extract_intel_samples(const string &samp)
+{
+    FILE* fpsamintel = fopen(samp.c_str(), "rb");
+    if (fpsamintel == NULL)
+    {
+        printf("open fpsamintel error\n");
+        exit(-1);
+    }
+    
+    int head[4];
+    fread(head, sizeof(int), 4, fpsamintel);
+    int aw = head[0];   // 40 in current cropped database
+    int ah = head[1];   // 40 in current cropped database
+    int N = head[2];    // 12102 faces currently in the cropped database
+    assert( N > 0 );
+    int imgarea = aw * ah;
+    uchar* pImgData = (uchar*)cvAlloc(sizeof(uchar)*imgarea * N);
+    fread(pImgData, sizeof(uchar), imgarea*N, fpsamintel);
+    fclose(fpsamintel);
+
+    char out_name[128];
+    for (int i = 0; i < N; i++) {
+        uchar* pImg = (uchar*)(pImgData + i*imgarea);
+        Mat img = Mat(ah, aw, CV_8UC1, pImg);
+        sprintf(out_name, "intelsample/%d.png", i);
+        imwrite(out_name, img);
+    }
+}
+
 // Transform Intel Training Samples to OpenCV Readable Training Samples
 void transform_IntelSample_To_OpenCVSample(const string &samp, const string &vec)
 {
@@ -11,7 +43,7 @@ void transform_IntelSample_To_OpenCVSample(const string &samp, const string &vec
     if (fpsamintel)
     {
         printf("open fpsamintel error\n");
-        exit(-1)
+        exit(-1);
     }
     
 	int head[4];
@@ -29,7 +61,7 @@ void transform_IntelSample_To_OpenCVSample(const string &samp, const string &vec
     if (fpsamopencv)
     {
         printf("open fpsamopencv error\n");
-        exit(-1)
+        exit(-1);
     }
     int count = N * 2;
     cout << N * 2 << endl;
@@ -77,7 +109,7 @@ void combile_vecs(const string &vec1, const string &vec2, const string &vec3)
     if (fvec1 == NULL || fvec2 == NULL || fvec3 == NULL)
     {
         printf("open vec file error\n");
-        exit(-1)
+        exit(-1);
     }
     
     int nvec1;
@@ -134,9 +166,9 @@ void show_vec_file(const string &vec)
     if (p == NULL)
     {
         printf("Open File %s error\n", vec.c_str());
-        exit(-1)
+        exit(-1);
     }
-    
+    const int image_size = 24;
     int vecsize;
     short tmp;
 
@@ -151,29 +183,72 @@ void show_vec_file(const string &vec)
     for (int i = 0; i < count; i++) {
         char chartmp = 0;
         fread( &chartmp, sizeof( chartmp ), 1, p );
-        short data[24*24];
-        fread(data, sizeof(short), 24*24, p);
+        short data[image_size*image_size];
+        fread(&data, sizeof(short), image_size*image_size, p);
         
-        Mat im = Mat(24, 24, CV_8UC1);
+        Mat im = Mat(image_size, image_size, CV_8UC1);
         int idx = 0;
-        for (int r = 0; r < 24; r++) {
-            for (int c = 0; c < 24; c++) {
+        for (int r = 0; r < image_size; r++) {
+            for (int c = 0; c < image_size; c++) {
                 im.at<uchar>(r, c) = (uchar)data[idx++];
             }
         }
-        // imshow("TEST", im);
-        // while (1) {
-        //     if (waitKey(10) == 'q') {
-        //         break;
-        //     }
-        // }
+        // char img_name[64];
+        // sprintf(img_name, "%d.png", i);
+        // imwrite(img_name, im);
+        imshow("TEST", im);
+        while (1) {
+            if (waitKey(10) == 'q') {
+                break;
+            }
+        }
     }
     
     fclose(p);
 }
 
-int main()
+void package_img_to_vec(const string &conf, const int num_image, const string dir, const string &vec)
+{
+    FILE *p = fopen(vec.c_str(), "wb");
+    FILE *pconf = fopen(conf.c_str(), "r");
+    const int image_size = 24;
+    int vecsize = image_size * image_size;
+    short tmp;
+    int count = num_image;
+    fwrite( &count, sizeof( count ), 1, p );
+    fwrite( &vecsize, sizeof( vecsize ), 1, p );
+    cout << count << endl;
+    cout << vecsize << endl;
+    fwrite( &tmp, sizeof( tmp ), 1, p );
+    fwrite( &tmp, sizeof( tmp ), 1, p );
+    char img_name[512];
+    for (int i = 0; i < count; i++) {
+        fscanf(pconf, "%s", img_name);
+        Mat im = imread(dir+img_name, 0);
+        Mat smallimg = Mat(image_size, image_size, CV_8UC1);
+        resize(im, smallimg, cv::Size(image_size, image_size), 0, 0, INTER_AREA);
+        char chartmp = 0;
+        fwrite( &chartmp, sizeof( chartmp ), 1, p);
+        short data[image_size*image_size];
+                
+        int idx = 0;
+        for (int r = 0; r < image_size; r++) {
+            for (int c = 0; c < image_size; c++) {
+                data[idx++] = (short)smallimg.at<uchar>(r, c);
+            }
+        }
+        fwrite(data, sizeof(short), vecsize, p);
+    }
+    
+    fclose(p);
+    fclose(pconf);
+}
+
+int main(int argc, char **argv)
 {
 //   combile_vecs(argv[1], argv[2], argv[3]); return 0;
 //   transformIntelSampleToOpenCvSample(argv[1], argv[2]); return 0;
+      show_vec_file(string(argv[1])); return 0;
+    // extract_intel_samples(string("facepos.samp")); return 0;
+     package_img_to_vec("flickrDM+45.txt", 21513, "/Volumes/ShengyinWu/ShengyinWu/study/papers/dataset/FLICKRFACE/images/faces/flickrDM+45/faces/", "flickrDM+45.vec");
 }
